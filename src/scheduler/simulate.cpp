@@ -523,7 +523,10 @@ find_timed_event(timed_event *te_list, const std::string &name, int ignore_disab
 		if (event_time == te->event_time || event_time == 0)
 			found_time = 1;
 
-		if (found_name + found_type + found_time == 3)
+		if (name.empty() || te->name == name)
+			found_name = 1;
+
+		if (found_type + found_time + found_name == 3)
 			break;
 	}
 
@@ -849,6 +852,9 @@ event_list *
 create_event_list(server_info *sinfo)
 {
 	event_list *elist;
+
+	if (should_create_calendar(sinfo) == false)
+		return NULL;
 
 	elist = new_event_list();
 
@@ -1398,7 +1404,6 @@ free_timed_event(timed_event *te)
 		if (te->event_type & TIMED_END_EVENT)
 			((resource_resv *)te->event_ptr)->end_event = NULL;
 	}
-
 	delete te;
 }
 
@@ -1443,8 +1448,10 @@ add_event(event_list *calendar, timed_event *te)
 	time_t current_time;
 	int events_is_null = 0;
 
-	if (calendar == NULL || calendar->current_time == NULL || te == NULL)
+	if (calendar == NULL || calendar->current_time == NULL || te == NULL) {
+		free_timed_event(te);
 		return 0;
+	}
 
 	current_time = *calendar->current_time;
 
@@ -1463,10 +1470,8 @@ add_event(event_list *calendar, timed_event *te)
 		if (te->event_time > current_time) {
 			if (te->event_time < calendar->next_event->event_time)
 				calendar->next_event = te;
-			else if (te->event_time == calendar->next_event->event_time) {
-				calendar->next_event =
-					find_timed_event(calendar->events, te->event_time);
-			}
+			else if (te->event_time == calendar->next_event->event_time)
+				calendar->next_event = find_timed_event(calendar->events, te->event_time);
 		}
 	}
 	/* if next_event == NULL, then we've simulated to the end. */
@@ -1554,6 +1559,9 @@ delete_event(server_info *sinfo, timed_event *e)
 	event_list *calendar;
 
 	if (sinfo == NULL || e == NULL)
+		return;
+	
+	if (should_create_calendar(sinfo) == false)
 		return;
 
 	calendar = sinfo->calendar;
@@ -2087,4 +2095,13 @@ generic_sim(event_list *calendar, unsigned int event_mask, time_t end, int defau
 		return 0;
 
 	return default_ret;
+}
+
+bool 
+should_create_calendar(server_info *sinfo)
+{
+	if (cstat.strict_ordering || sc_attrs.sched_preempt_enforce_resumption || sinfo->resvs != NULL)
+		return true;
+
+	return false;
 }

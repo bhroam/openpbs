@@ -42,6 +42,7 @@
 
 #include "data_types.h"
 #include "constant.h"
+#include "globals.h"
 
 /*
  *	simulate_events - simulate the future of a PBS universe
@@ -455,5 +456,6 @@ void free_te_list(te_list *tel);
 int add_te_list(te_list **tel, timed_event *te);
 int remove_te_list(te_list **tel, timed_event *e);
 
+bool should_create_calendar(server_info *sinfo);
 
 #endif /* _SIMULATE_H */

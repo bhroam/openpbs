@@ -725,7 +725,7 @@ query_resv(struct batch_status *resv, server_info *sinfo, resource_resv *presres
 		} else {
 			count = strtol(attrp->value, &endp, 10);
 			if (*endp != '\0')
-				count = -1;
+				count = UNSPECIFIED;
 		}
 
 		if (!strcmp(attrp->name, ATTR_resv_owner)) {

@@ -350,9 +350,11 @@ query_node_info(struct batch_status *node, server_info *sinfo, node_info *prev_n
 			unset = true;
 			count = 0;
 			endp = NULL;
-		} else count = strtol(attrp->value, &endp, 10);
+		} else  {
+			count = strtol(attrp->value, &endp, 10);
 			if (*endp != '\0')
-				count = -1;
+				count = UNSPECIFIED;
+		}
 		if (!strcmp(attrp->name, ATTR_NODE_state))
 			set_node_info_state(ninfo, attrp->value);
 

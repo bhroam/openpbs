@@ -346,9 +346,11 @@ query_server(status *pol, int pbs_sd, server_info *sinfo)
 
 	/* create res_to_check arrays based on current jobs/resvs */
 	auto new_resdef_to_check = collect_resources_from_requests(sinfo->all_resresv);
-	if (policy->resdef_to_check.empty() || new_resdef_to_check != policy->resdef_to_check)
+	if (policy->resdef_to_check.empty() || new_resdef_to_check != policy->resdef_to_check) {
 		recreate_resdef = 1;
-	
+		policy->resdef_to_check = new_resdef_to_check;
+	}
+
 	if (recreate_resdef) {
 		free(sinfo->nodesigs);
 		sinfo->nodesigs = NULL;

@@ -345,18 +345,20 @@ query_node_info(struct batch_status *node, server_info *sinfo, node_info *prev_n
 
 	attrp = node->attribs;
 	for (attrp = node->attribs; attrp != NULL; attrp = attrp->next) {
-		if (attrp->value != NULL) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp != '\0')
-				count = -1;
-		} else {
+		bool unset = false;
+		if (attrp->value[0] == '\0') {
+			unset = true;
 			count = 0;
 			endp = NULL;
-		}
+		} else count = strtol(attrp->value, &endp, 10);
+			if (*endp != '\0')
+				count = -1;
 		if (!strcmp(attrp->name, ATTR_NODE_state))
 			set_node_info_state(ninfo, attrp->value);
 
 		else if (!strcmp(attrp->name, ATTR_server_inst_id)) {
+			if (ninfo->svr_inst_id != NULL)
+				free(ninfo->svr_inst_id);
 			ninfo->svr_inst_id = string_dup(attrp->value);
 			if (ninfo->svr_inst_id == NULL) {
 				if (ninfo != prev_ninfo)
@@ -391,25 +393,33 @@ query_node_info(struct batch_status *node, server_info *sinfo, node_info *prev_n
 				free_string_array(ninfo->jobs);
 			ninfo->jobs = break_comma_list(attrp->value);
 		} else if (!strcmp(attrp->name, ATTR_maxrun)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp == '\0')
+			if (unset)
+				ninfo->max_running = SCHD_INFINITY;
+			else if (*endp == '\0')
 				ninfo->max_running = count;
 		}
 		else if (!strcmp(attrp->name, ATTR_maxuserrun)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp == '\0')
+			if (unset)
+				ninfo->max_user_run = SCHD_INFINITY;
+			else if (*endp == '\0') {
 				ninfo->max_user_run = count;
-			ninfo->has_hard_limit = 1;
+				ninfo->has_hard_limit = 1;
+			}
 		}
 		else if (!strcmp(attrp->name, ATTR_maxgrprun)) {
-			ninfo->max_group_run = count;
-			ninfo->has_hard_limit = 1;
+			if (unset)
+				ninfo->max_group_run = SCHD_INFINITY;
+			else if (*endp == '\0') {
+				ninfo->max_group_run = count;
+				ninfo->has_hard_limit = 1;
+			}
 		}
 		else if (!strcmp(attrp->name, ATTR_queue))
 			ninfo->queue_name = attrp->value;
 		else if (!strcmp(attrp->name, ATTR_p)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp == '\0')
+			if (unset)
+				ninfo->priority = 0;
+			else if (*endp == '\0')
 				ninfo->priority = count;
 		}
 		else if (!strcmp(attrp->name, ATTR_NODE_Sharing)) {
@@ -470,28 +480,41 @@ query_node_info(struct batch_status *node, server_info *sinfo, node_info *prev_n
 				}
 			}
 		} else if (!strcmp(attrp->name, ATTR_NODE_NoMultiNode)) {
-			if (!strcmp(attrp->value, ATR_TRUE))
-				ninfo->no_multinode_jobs = 1;
+			if (unset || strcmp(attrp->value, ATR_FALSE) == 0)
+				ninfo->no_multinode_jobs = false;
+			else
+				ninfo->no_multinode_jobs = true;
 		} else if (!strcmp(attrp->name, ATTR_ResvEnable)) {
-			if (!strcmp(attrp->value, ATR_TRUE))
-				ninfo->resv_enable = 1;
+			if (unset || strcmp(attrp->value, ATR_FALSE) == 0)
+				ninfo->resv_enable = false;
+			else
+				ninfo->resv_enable = true;
 		} else if (!strcmp(attrp->name, ATTR_NODE_ProvisionEnable)) {
-			if (!strcmp(attrp->value, ATR_TRUE))
-				ninfo->provision_enable = 1;
+			if (unset || strcmp(attrp->value, ATR_FALSE) == 0)
+				ninfo->provision_enable = false;
+			else
+				ninfo->provision_enable = true;
 		} else if (!strcmp(attrp->name, ATTR_NODE_current_aoe)) {
-			if (attrp->value != NULL)
+			if (unset)
+				set_current_aoe(ninfo, NULL);
+			else
 				set_current_aoe(ninfo, attrp->value);
 		} else if (!strcmp(attrp->name, ATTR_NODE_power_provisioning)) {
-			if (!strcmp(attrp->value, ATR_TRUE))
-				ninfo->power_provisioning = 1;
+			if (unset || strcmp(attrp->value, ATR_FALSE) == 0)
+				ninfo->power_provisioning = false;
+			else
+				ninfo->power_provisioning = true;
 		} else if (!strcmp(attrp->name, ATTR_NODE_current_eoe)) {
-			if (attrp->value != NULL)
+			if (unset)
+				set_current_eoe(ninfo, NULL);
+			else
 				set_current_eoe(ninfo, attrp->value);
 		} else if (!strcmp(attrp->name, ATTR_NODE_in_multivnode_host)) {
-			if (attrp->value != NULL) {
-				ninfo->is_multivnoded = count;
-				if ((!sinfo->has_multi_vnode) && (count != 0))
-					sinfo->has_multi_vnode = 1;
+			if (unset || !count)
+				ninfo->is_multivnoded = false;
+			else {
+				ninfo->is_multivnoded = true;
+				sinfo->has_multi_vnode = 1;
 			}
 		} else if (!strcmp(attrp->name, ATTR_NODE_last_state_change_time)) {
 			ninfo->last_state_change_time = count;
@@ -499,10 +522,10 @@ query_node_info(struct batch_status *node, server_info *sinfo, node_info *prev_n
 			ninfo->last_used_time = count;
 		} else if (!strcmp(attrp->name, ATTR_NODE_resvs)) {
 			free_string_array(ninfo->resvs);
-			if (attrp->value != NULL)
-				ninfo->resvs = break_comma_list(attrp->value);
-			else
+			if (unset)
 				ninfo->resvs = NULL;
+			else
+				ninfo->resvs = break_comma_list(attrp->value);
 		}
 	}
 

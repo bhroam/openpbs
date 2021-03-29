@@ -1741,7 +1741,7 @@ diff_batch_status(struct batch_status *old_bs, struct batch_status *bs)
 		} else if (cmp == 1) { 
 			new_attr = dup_attrl2(pattr);
 			free(new_attr->value);
-			new_attr->value = NULL;
+			new_attr->value = string_dup("");
 		}
 
 		if (new_attr != NULL) {

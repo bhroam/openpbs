@@ -718,13 +718,14 @@ query_resv(struct batch_status *resv, server_info *sinfo, resource_resv *presres
 	attrp = resv->attribs;
 
 	while (attrp != NULL) {
-		if (attrp->value != NULL) {
+		bool unset = false;
+		if (attrp->value[0] == '\0') {
+			unset = true;
+			endp = NULL;
+		} else {
 			count = strtol(attrp->value, &endp, 10);
 			if (*endp != '\0')
 				count = -1;
-		} else {
-			count = 0;
-			endp = NULL;
 		}
 
 		if (!strcmp(attrp->name, ATTR_resv_owner)) {
@@ -732,6 +733,8 @@ query_resv(struct batch_status *resv, server_info *sinfo, resource_resv *presres
 				free(advresv->user);
 			advresv->user = string_dup(attrp->value);
 		} else if (!strcmp(attrp->name, ATTR_egroup)) {
+			if (advresv->group != NULL)
+				free(advresv->group);
 			advresv->group = string_dup(attrp->value);
 		} else if (!strcmp(attrp->name, ATTR_queue)) {
 			if (advresv->resv->queuename != NULL)
@@ -746,8 +749,9 @@ query_resv(struct batch_status *resv, server_info *sinfo, resource_resv *presres
 				int i;
 				for (i = 0; advresv->select->chunks[i] != NULL; i++)
 					if (advresv->select->chunks[i]->req == NULL)
-						advresv->is_invalid = 1;
-			}
+						advresv->is_invalid = true;
+			} else
+				advresv->is_invalid = true;
 		} else if (!strcmp(attrp->name, ATTR_resv_start))
 			advresv->resv->req_start = count;
 		else if (!strcmp(attrp->name, ATTR_resv_end))
@@ -755,20 +759,41 @@ query_resv(struct batch_status *resv, server_info *sinfo, resource_resv *presres
 		else if (!strcmp(attrp->name, ATTR_resv_duration))
 			advresv->resv->req_duration = count;
 		else if (!strcmp(attrp->name, ATTR_resv_alter_revert)) {
-			if (!strcmp(attrp->resource, "start_time"))
-				advresv->resv->req_start_orig = count;
-			else if (!strcmp(attrp->resource, "walltime"))
-				advresv->resv->req_duration_orig = (time_t) res_to_num(attrp->value, NULL);
+			if (!strcmp(attrp->resource, "start_time")) {
+				if (unset)
+					advresv->resv->req_start_orig = UNSPECIFIED;
+				else 
+					advresv->resv->req_start_orig = count;
+			} else if (!strcmp(attrp->resource, "walltime")) {
+				if (unset)
+					advresv->resv->req_duration_orig = UNSPECIFIED;
+				else
+					advresv->resv->req_duration_orig = (time_t) res_to_num(attrp->value, NULL);
+			}
 		} else if (!strcmp(attrp->name, ATTR_resv_standing_revert)) {
-			if (!strcmp(attrp->resource, "start_time"))
-				advresv->resv->req_start_standing = count;
-			else if (!strcmp(attrp->resource, "walltime"))
-				advresv->resv->req_duration_standing = (time_t) res_to_num(attrp->value, NULL);
-			else if (!strcmp(attrp->resource, "select"))
-				advresv->resv->select_standing = parse_selspec(attrp->value);
-		} else if (!strcmp(attrp->name, ATTR_resv_retry))
-			advresv->resv->retry_time = count;
-		else if (!strcmp(attrp->name, ATTR_resv_state))
+			if (!strcmp(attrp->resource, "start_time")) {
+				if (unset)
+					advresv->resv->req_start_standing = UNSPECIFIED;
+				else
+					advresv->resv->req_start_standing = count;
+			} else if (!strcmp(attrp->resource, "walltime")) {
+				if (unset)
+					advresv->resv->req_duration_standing = UNSPECIFIED;
+				else
+					advresv->resv->req_duration_standing = (time_t) res_to_num(attrp->value, NULL);
+			} else if (!strcmp(attrp->resource, "select")) { 
+				if (unset) {
+					delete advresv->resv->select_standing;
+					advresv->resv->select_standing = NULL;
+				} else
+					advresv->resv->select_standing = parse_selspec(attrp->value);
+			}
+		} else if (!strcmp(attrp->name, ATTR_resv_retry)) {
+			if (unset)
+				advresv->resv->retry_time = UNSPECIFIED;
+			else
+				advresv->resv->retry_time = count;
+		} else if (!strcmp(attrp->name, ATTR_resv_state))
 			advresv->resv->resv_state = (enum resv_states) count;
 		else if (!strcmp(attrp->name, ATTR_resv_substate))
 			advresv->resv->resv_substate = (enum resv_states) count;
@@ -800,7 +825,10 @@ query_resv(struct batch_status *resv, server_info *sinfo, resource_resv *presres
 		} else if (!strcmp(attrp->name, ATTR_node_set)) {
 			if (advresv->node_set_str != NULL)
 				free_string_array(advresv->node_set_str);
-			advresv->node_set_str = break_comma_list(attrp->value);
+			if (unset)
+				advresv->node_set_str = NULL;
+			else
+				advresv->node_set_str = break_comma_list(attrp->value);
 		} else if (!strcmp(attrp->name, ATTR_resv_timezone)) {
 			if (advresv->resv->timezone != NULL)
 				free(advresv->resv->timezone);
@@ -827,7 +855,10 @@ query_resv(struct batch_status *resv, server_info *sinfo, resource_resv *presres
 		} else if (!strcmp(attrp->name, ATTR_SchedSelect_orig)) {
 			if (advresv->resv->select_orig != NULL)
 				delete advresv->resv->select_orig;
-			advresv->resv->select_orig = parse_selspec(attrp->value);
+			if (unset)
+				advresv->resv->select_orig = NULL;
+			else
+				advresv->resv->select_orig = parse_selspec(attrp->value);
 			if (resv_nodes == NULL)
 				resv_nodes = advresv->resv->resv_nodes_str;
 		} else if (!strcmp(attrp->name, ATTR_server_inst_id)) {

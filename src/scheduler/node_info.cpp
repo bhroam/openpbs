@@ -231,10 +231,12 @@ query_nodes(int pbs_sd, server_info *sinfo)
 
 	if ((nodes = pbs_statvnode(pbs_sd, NULL, attrib, extend_buf)) == NULL) {
 		log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "statvnode", "After pbs_statvnode()");
-
-		err = pbs_geterrmsg(pbs_sd);
-		log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_INFO, "", "Error getting nodes: %s", err);
-		return NULL;
+		if (pbs_errno > 0) {
+			err = pbs_geterrmsg(pbs_sd);
+			log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_INFO, "", "Error getting nodes: %s", err);
+			return NULL;
+		} else
+			return sinfo->nodes;
 	}
 	log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "statvnode", "After pbs_statvnode()");
 
